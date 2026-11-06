@@ -1,0 +1,15 @@
+"""Bundled Android origin without a save bridge must not report a download."""
+exec(open(__file__.replace('native-unsupported.py','smoke.py')).read().split('with sync_playwright()')[0])
+with sync_playwright() as p:
+    browser=p.chromium.launch(executable_path=os.getenv('CHROME','/usr/bin/google-chrome'),headless=True,args=['--no-sandbox'])
+    page=browser.new_page(viewport={'width':412,'height':915})
+    page.route('https://appassets.androidplatform.net/assets/www/**',lambda r:r.fulfill(response=page.request.get(base+r.request.url.split('/assets/www/',1)[1])))
+    page.goto('https://appassets.androidplatform.net/assets/www/index.html');page.click('#btn-new-project');page.wait_for_selector('#app:not(.hidden)');page.set_input_files('#file-video',str(ROOT/'test-assets/photo.jpg'));page.wait_for_function('window.__alya.state.clips.length===1')
+    page.evaluate('()=>{window.engineCalled=false;Exporter.exportVideo=async()=>{window.engineCalled=true;return new Blob()}}')
+    page.click('#btn-export');page.click('#btn-start-export');page.wait_for_function('document.querySelector("#export-msg").textContent.includes("WebView update")')
+    assert not page.evaluate('window.engineCalled')
+    assert not page.locator('#btn-start-export').is_disabled()
+    page.screenshot(path='/downloads/native-unsupported.png')
+    print('PASS: Android origin without save bridge gives actionable failure before encoding, no false download. Simulated origin, not physical Android.')
+    browser.close()
+server.shutdown()

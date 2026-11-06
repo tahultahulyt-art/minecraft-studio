@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<!-- App name confirmed by user: Minecraft Studio -->
+<title>Minecraft Studio</title>
+<meta name="theme-color" content="#0f150f">
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='8' fill='%233e5a2b'/><rect width='100' height='34' rx='8' fill='%235dac3f'/><path d='M38 44 L72 62 L38 80 Z' fill='white'/></svg>">
+</head>
+<body>
+<div id="custom-bg" class="hidden" aria-hidden="true"></div>
+<div id="home-screen" class="hidden">
+  <div class="home-inner">
+    <div class="home-topbar">
+      <button id="btn-quick-import" class="home-import" title="Import a video or photo">⇪ Import</button>
+      <button id="btn-home-search" class="home-search-toggle" title="Search projects" aria-label="Search projects">🔍</button>
+    </div>
+    <input id="home-search" class="home-search hidden" type="search" placeholder="Projects dhundo..." aria-label="Search projects">
+    <div class="home-hero">
+      <div class="home-brand"><span class="brand-name">Minecraft</span><span class="brand-sub">Studio</span></div>
+      <div class="home-tag">Apna chhota editing studio</div>
+    </div>
+    <div class="home-cards">
+      <button id="btn-new-project" class="home-card primary-card"><span class="card-icon">🎬</span><span class="card-title">New video</span><span class="card-sub">Video edit karo</span></button>
+      <button id="btn-edit-photo" class="home-card"><span class="card-icon">🖼️</span><span class="card-title">Edit photo</span><span class="card-sub">Photo pe kaam</span></button>
+    </div>
+    <div class="home-tools">
+      <button class="tool-tile" data-panel="templates"><span class="tile-icon">◇</span><span class="tile-name">Templates</span></button>
+      <button class="tool-tile" data-panel="ai"><span class="tile-icon">✧</span><span class="tile-name">Captions</span></button>
+      <button class="tool-tile" data-panel="ai"><span class="tile-icon">✂️</span><span class="tile-name">Remove BG</span></button>
+      <button class="tool-tile" data-panel="filters"><span class="tile-icon">☆</span><span class="tile-name">Effects</span></button>
+      <button class="tool-tile" data-panel="music"><span class="tile-icon">♫</span><span class="tile-name">Music</span></button>
+      <button class="tool-tile" data-panel="text"><span class="tile-icon">𝐓</span><span class="tile-name">Text</span></button>
+      <button class="tool-tile" data-soon="1"><span class="tile-icon">⚡</span><span class="tile-name">Enhance quality</span><span class="tile-soon">Coming soon</span></button>
+      <button class="tool-tile" data-soon="1"><span class="tile-icon">🤖</span><span class="tile-name">AI generator</span><span class="tile-soon">Coming soon</span></button>
+      <button class="tool-tile" data-soon="1"><span class="tile-icon">🎞️</span><span class="tile-name">AutoCut</span><span class="tile-soon">Coming soon</span></button>
+    </div>
+    <button id="btn-import-backup" class="home-backup">Backup kholna (.mcs)</button>
+    <input id="file-backup" type="file" accept=".mcs,application/json" hidden>
+    <div class="hint">Portable backup: max 20MB project. Original ko overwrite nahi karta.</div>
+    <div class="home-list-head" id="home-projects-head">Projects <span class="hint">(is device pe saved)</span></div>
+    <div id="storage-status" class="hint" role="status"></div>
+    <div id="projects-list"></div>
+    <div id="home-toast" class="hint" role="status"></div>
+    <div id="home-credit">Made by Rahul_the_og</div>
+    <nav class="home-tabs" aria-label="Sections">
+      <button class="home-tab" data-scroll="top"><span>✂️</span><small>Edit</small></button>
+      <button class="home-tab" data-panel="templates"><span>◇</span><small>Templates</small></button>
+      <button class="home-tab" data-soon="1"><span>✧</span><small>AI Lab</small><i class="tab-soon">soon</i></button>
+      <button class="home-tab" data-scroll="projects"><span>▱</span><small>Projects</small></button>
+    </nav>
+  </div>
+</div>
+<div id="app">
+  <header id="topbar">
+    <div class="brand">
+      <span class="brand-name">Minecraft</span>
+      <span class="brand-sub">Studio</span>
+    </div>
+    <div class="top-actions">
+      <span id="proj-title" class="proj-title"></span><button id="quality-pill" class="quality-pill" title="Export quality">480p</button>
+      <button id="btn-home" class="icon-btn" title="Home">⌂</button>
+      <button id="btn-undo" class="icon-btn" title="Undo" disabled>↩</button>
+      <button id="btn-redo" class="icon-btn" title="Redo" disabled>↪</button>
+      <button id="btn-export" class="export-btn" disabled>Export</button>
+    </div>
+  </header>
+
+  <dialog id="render-preview-dialog"><div class="panel-head"><span>Rendered preview · 480p30</span><button id="preview-close" class="panel-close" aria-label="Close rendered preview">✕</button></div><div class="panel-body"><p class="hint">On-demand render uses the export engine, including transition overlaps, audio effects, blur and image keying. This is not instant timeline playback. 30s output max here; longer projects use Export. Phone memory/performance untested.</p><button id="preview-build" class="chip-btn primary">Render current project</button><div id="preview-render-status" class="hint" role="status"></div><video id="rendered-preview-video" controls playsinline hidden></video><div class="hint">A rendered snapshot, not live editing. Changes need a new render. Video stays on this device. Closing discards the result, but a running render finishes in the background before the engine can be used again.</div></div></dialog>
+  <div id="save-status" class="hint" role="status"></div>
+  <aside id="workspace-sidebar" aria-label="Workspace">
+    <button id="side-new" title="New project"><span>⊞</span><small>New</small></button>
+    <button id="side-projects" title="Projects"><span>▱</span><small>Projects</small></button>
+    <button id="side-templates" title="Templates"><span>◇</span><small>Styles</small></button>
+    <button id="side-effects" title="Effects"><span>☆</span><small>Effects</small></button>
+    <button id="side-ai" title="AI Edit"><span>✧</span><small>AI</small></button>
+    <button id="side-settings" title="Settings"><span>⚙</span><small>Settings</small></button>
+  </aside>
+  <main id="stage-wrap">
+    <div id="stage">
+      <div id="video-slot"></div>
+      <div id="text-overlay-slot"></div>
+      <div id="empty-state">
+        <div class="empty-icon">🎬</div>
+        <div class="empty-title">Apni pehli video banao</div>
+        <div class="empty-desc">Clips ya photos add karo, phir trim, text, music, filters sab kuch yahin.</div>
+        <button id="btn-add-first" class="big-add">+ Add clips / photos</button>
+      </div>
+      <div id="stage-spinner" class="hidden"><div class="spinner"></div><div id="spinner-msg">Loading...</div></div>
+    </div>
+    <div id="transport">
+      <button id="btn-render-preview" class="icon-btn" title="Render accurate preview" aria-label="Render accurate preview">◉</button>
+      <button id="btn-play" class="icon-btn" disabled>▶</button>
+      <span id="time-display">0:00 / 0:00</span>
+      <button id="btn-fullscreen" class="icon-btn" title="Fullscreen">⛶</button>
+    </div>
+  </main>
+
+  <section id="timeline-zone"><div id="seek-controls"><label>Go to seconds <input id="seek-seconds" class="num" type="number" min="0" step="0.01" value="0"></label><button id="seek-apply" class="chip-btn">Go</button><button id="seek-frame-prev" class="chip-btn" title="Previous frame (30fps grid)" aria-label="Previous frame">‹f</button><button id="seek-frame-next" class="chip-btn" title="Next frame (30fps grid)" aria-label="Next frame">f›</button><span id="seek-status" role="status"></span></div>
+    <div id="timeline-zoom"><button id="zoom-out" aria-label="Timeline zoom out">-</button><span id="zoom-label">Timeline 1x</span><button id="zoom-in" aria-label="Timeline zoom in">+</button></div>
+    <div id="timeline-scroll"><div id="timeline"></div></div>
+    <div id="playhead-strip"><div id="playhead"></div></div>
+  </section>
+
+  <div class="panel hidden" id="panel-settings"><div class="panel-head"><span>Workspace settings</span><button class="panel-close">✕</button></div><div class="panel-body">
+    <p class="hint">Minecraft Studio · Made by Rahul_the_og</p>
+    <div class="row-btns wrap"><button id="btn-set-bg" class="chip-btn primary">Choose my wallpaper</button><button id="btn-remove-bg" class="chip-btn">Remove wallpaper</button></div>
+    <input id="file-bg" type="file" accept="image/*" hidden>
+    <div id="wallpaper-status" class="hint" role="status">Optional photo stays on this device. It never becomes part of an exported video.</div>
+    <p class="hint">Original neon workspace. No Premium paywall. Preview shows your clips, not decorative character art.</p>
+  </div></div>
+  <nav id="toolbar">
+    <button class="tool-btn" data-panel="clips" disabled><span class="t-ic">🎞</span><span>Edit</span></button>
+    <button class="tool-btn" data-panel="overlays"><span class="t-ic">◈</span><span>Overlay</span></button>
+    <button class="tool-btn" data-panel="text"><span class="t-ic">✎</span><span>Text</span></button>
+    <button class="tool-btn" data-panel="music"><span class="t-ic">♫</span><span>Audio</span></button>
+    <button class="tool-btn" data-panel="filters"><span class="t-ic">✨</span><span>Effects</span></button>
+    <button class="tool-btn" data-panel="templates"><span class="t-ic">🎨</span><span>Styles</span></button>
+    <button class="tool-btn" data-panel="ai"><span class="t-ic">🪄</span><span>AI Edit</span></button>
+  </nav>
+
+<div class="panel hidden" id="panel-overlays">
+<div class="panel-head"><span>Image / emoji overlays</span><button class="panel-close">✕</button></div>
+<div class="panel-body"><div class="row-btns wrap"><button id="ov-import" class="chip-btn primary">+ PNG / photo</button><input id="ov-file" type="file" accept="image/*" class="hidden"><input id="ov-emoji" type="text" value="🔥" aria-label="Emoji" maxlength="16" style="width:85px"><button id="ov-add-emoji" class="chip-btn">+ Emoji</button></div>
+<div class="hint">Image layer, sticker pack nahi. Image locally compress hoti hai. Timing project timeline ke seconds mein hai. Export mein same layer burn hoti hai.</div><div id="ov-list"></div>
+<div id="ov-controls" class="hidden">
+<label class="mini-label">X <input id="ov-x" type="range" min="0" max="100"></label>
+<label class="mini-label">Y <input id="ov-y" type="range" min="0" max="100"></label>
+<label class="mini-label">Size (% of canvas) <input id="ov-size" type="range" min="5" max="90"></label>
+<label class="mini-label">Rotate <input id="ov-angle" type="range" min="-180" max="180"></label>
+<div class="row-btns"><label class="mini-label">Start <input id="ov-start" class="num" type="number" min="0" step="0.1"></label><label class="mini-label">End <input id="ov-end" class="num" type="number" min="0.1" step="0.1"></label></div>
+<div class="row-btns wrap"><label class="mini-label">Layer opacity % <input id="ov-opacity" class="num" type="number" min="0" max="100" value="100"></label><button id="ov-opacity-apply" class="chip-btn">Set opacity</button></div><div id="ov-opacity-status" class="hint" role="status"></div><button id="ov-remove-bg" class="chip-btn">Remove person background (experimental)</button><div id="ov-remove-status" class="hint">Person photos only, on-device. First use loads ~10MB engine; slow phones may pause. Not video or arbitrary-object removal. Undo available.</div><details><summary>Refine transparent image edges</summary><div class="hint">Works on PNG/cutout transparency, not opaque photo background removal. Shrink trims a few image pixels; feather softens alpha edges. Each apply changes this layer image; Undo restores it. Does not fix missing hair or choose an object.</div><label class="mini-label">Shrink pixels <input id="ov-edge-shrink" type="range" min="0" max="4" value="0"></label><label class="mini-label">Feather pixels <input id="ov-edge-feather" type="range" min="0" max="4" value="1"></label><button id="ov-edge-apply" class="chip-btn">Apply edge refinement</button><div id="ov-edge-status" class="hint" role="status"></div></details><label class="toggle-row"><input id="ov-motion" type="checkbox">Animate position</label><label class="mini-label">End X <input id="ov-endx" type="range" min="0" max="100" value="80"></label><label class="mini-label">End Y <input id="ov-endy" type="range" min="0" max="100" value="50"></label><div class="row-btns wrap"><button id="ov-kf-enable" class="chip-btn">Edit keyframes</button><button id="ov-kf-add" class="chip-btn">+ Point at playhead</button><button id="ov-kf-clear" class="chip-btn">Reset to endpoints</button></div><label class="mini-label">Motion <select id="ov-easing" class="sel"><option value="linear">Linear</option><option value="smooth">Smooth ease</option></select></label><div id="ov-keyframes"></div><details><summary>Experimental patch tracking</summary><div class="hint">Move this layer's X/Y onto a small textured detail in the video at layer start. Track uses8 sampled frames, up to8s, inside one video clip. No AI/object recognition, scale/rotation or occlusion recovery. Repeated patterns/fast moves can drift. Replaces existing motion points. Review all points before keeping them; Undo available.</div><button id="ov-track-patch" class="chip-btn">Track patch under layer center</button><div id="ov-track-status" class="hint" role="status"></div></details><div id="ov-kf-status" class="hint" role="status"></div><div class="hint">Up to 8 position/size/rotation points. Time is seconds from layer start. Preview/export share interpolation; smooth ease slows at each point. Size/angle can change per point. Animated size/rotation needs more memory; use short clips and480p on slow devices. Old End X/Y controls work when custom points are reset.</div><label class="toggle-row"><input id="ov-chroma" type="checkbox">Green screen (this image layer, export only)</label><label class="mini-label">Key color <input id="ov-keycolor" type="color" value="#00ff00"></label><label class="mini-label">Similarity <input id="ov-similarity" type="range" min="1" max="70" value="20"></label><div class="hint">Chroma key removes one color from an imported image layer. Not AI background removal; For video solid-color keying use Clip tools. This image-layer preview shows the original image; rendered preview shows the key.</div><div class="row-btns wrap"><button id="ov-duplicate" class="chip-btn">Duplicate layer</button><button id="ov-backward" class="chip-btn">Layer back</button><button id="ov-forward" class="chip-btn">Layer front</button><button id="ov-done" class="chip-btn">Done</button><button id="ov-delete" class="chip-btn danger">Delete layer</button></div></div></div></div>
+
+  <!-- Panels -->
+  <div id="panel-backdrop" class="hidden"></div>
+
+  <div class="panel hidden" id="panel-clips">
+    <div class="panel-head"><span>Clip tools</span><button class="panel-close">✕</button></div>
+    <div class="panel-body">
+      <div class="row-btns wrap">
+        <button id="btn-add-more" class="chip-btn">+ Add</button>
+        <details class="speed-curve"><summary>Speed curve / ramp</summary><div class="hint">Selected video ke source mein start → middle → end speed. Apply se editable clips banti hain; Undo se original wapas. Smooth mode 12 small steps ka approximation hai, continuous optical-flow nahi. Transitions on ho to split segments ke beech bhi transition lag sakti hai.</div><div class="row-btns wrap"><label class="mini-label">Start × <input id="curve-start" class="num" type="number" min="0.5" max="4" step="0.1" value="0.5"></label><label class="mini-label">Middle × <input id="curve-mid" class="num" type="number" min="0.5" max="4" step="0.1" value="2"></label><label class="mini-label">End × <input id="curve-end" class="num" type="number" min="0.5" max="4" step="0.1" value="0.5"></label></div><select id="curve-mode" class="sel"><option value="steps">3 sections (stepped)</option><option value="smooth">Smooth approximation (12 sections)</option></select><button id="btn-speed-curve" class="chip-btn primary">Apply speed curve</button></details><button id="btn-freeze" class="chip-btn">Freeze 3s</button><button id="btn-reverse" class="chip-btn">Reverse clip</button><button id="btn-split" class="chip-btn">✂ Split at playhead</button>
+        <button id="btn-speed" class="chip-btn">⚡ Speed</button>
+        <select id="transition-type" class="sel" aria-label="Transition style"><option value="fade">Dissolve</option><option value="zoomin">Zoom in</option><option value="slideleft">Slide left</option><option value="slideright">Slide right</option><option value="slideup">Slide up</option><option value="slidedown">Slide down</option><option value="pixelize">Pixel glitch</option><option value="hblur">Blur</option><option value="wipeleft">Wipe</option><option value="circleopen">Circle</option></select><button id="btn-transitions" class="chip-btn">🔄 Crossfade: off</button>
+        <button id="btn-flip-x" class="chip-btn" aria-pressed="false">Flip horizontal</button><button id="btn-flip-y" class="chip-btn" aria-pressed="false">Flip vertical</button><button id="clip-duplicate" class="chip-btn">Duplicate clip</button><button id="clip-earlier" class="chip-btn">Move earlier</button><button id="clip-later" class="chip-btn">Move later</button><button id="btn-delete-clip" class="chip-btn danger">🗑 Delete</button>
+      </div>
+      <div class="row-btns wrap"><label class="mini-label">Photo seconds <input id="photo-duration" type="number" min="0.2" max="60" step="0.1" value="3" class="num"></label><button id="btn-photo-duration" class="chip-btn">Set photo duration</button></div>
+      <div class="row-btns wrap"><label class="mini-label">Clip audio % <input id="clip-volume" class="num" type="number" min="0" max="100" step="1" value="100"></label><button id="clip-volume-apply" class="chip-btn">Set clip volume</button></div><div id="clip-volume-status" class="hint" role="status">Selected video audio only,0-100%. Music volume is separate. Global mute still wins.</div><details id="numeric-trim-controls"><summary>Precise video trim (source seconds)</summary><div class="row-btns wrap"><label class="mini-label">In <input id="clip-trim-start" class="num" type="number" min="0" step="0.01"></label><label class="mini-label">Out <input id="clip-trim-end" class="num" type="number" min="0" step="0.01"></label><button id="clip-trim-apply" class="chip-btn">Set trim</button></div><div class="hint">Source seconds, not output time after speed. Minimum0.2s. No frame-by-frame or keyframe snapping.</div></details><div id="clip-trim-status" class="hint" role="status"></div><div class="row-btns wrap"><label class="mini-label">Transition seconds <input id="transition-seconds" class="num" type="number" min="0.2" max="2" step="0.1" value="0.5"></label><button id="transition-time-apply" class="chip-btn">Set transition time</button></div><div id="transition-time-status" class="hint" role="status">0.2-2s, same overlap at every cut. Short clips cap it; very short clips hard-cut. Rendered preview/export only.</div><div id="transition-timing" class="hint"></div><div class="hint">Text/image timing output seconds mein rehti hai. Transitions se video short hoti hai; final duration ke baad wale overlays export mein nahi dikhenge. Markers/preview original clip timing pe hain. Exact beat cuts ke liye transitions OFF rakho.</div><div class="hint">Transitions export mein render hoti hain. Timeline preview abhi hard cut hai; ◉ button se accurate rendered preview banao. Pixel-glitch ek pixelated transition hai, RGB glitch nahi.</div>
+      <details id="video-key-controls"><summary>Video green screen (solid background)</summary><div class="hint">Selected video, max20s. Removes one color and replaces it with a solid color in a new local clip. Not AI cutout or multi-video layering. Check edges before keeping it. Audio and trimmed duration retained, speed resets to1x. Undo available.</div><div class="row-btns wrap"><label class="mini-label">Key <input id="video-key-color" type="color" value="#00ff00"></label><label class="mini-label">Background <input id="video-key-background" type="color" value="#140a24"></label></div><label class="mini-label">Similarity <input id="video-key-similarity" type="range" min="1" max="60" value="20"></label><button id="btn-video-key" class="chip-btn">Render keyed clip</button></details><div id="clip-process-status" class="hint"></div><label class="mini-label">Canvas <select id="canvas-ratio" class="sel"><option value="16:9">16:9 landscape</option><option value="9:16">9:16 portrait</option><option value="1:1">1:1 square</option><option value="4:5">4:5 portrait</option></select></label><label class="toggle-row"><input type="checkbox" id="canvas-blur">Blur background (export)</label><div class="hint">Freeze adds a 3s still at the playhead. Reverse creates a new local clip, including reversed audio. Short clips recommended: reverse keeps frames in memory. Blur is export-only; preview uses black bars.</div><div id="speed-row" class="hidden">
+        <span class="mini-label">Speed:</span>
+        <div class="row-btns wrap" id="speed-options">
+          <button class="chip-btn speed-opt" data-speed="0.5">0.5x</button>
+          <button class="chip-btn speed-opt sel" data-speed="1">1x</button>
+          <button class="chip-btn speed-opt" data-speed="1.5">1.5x</button>
+          <button class="chip-btn speed-opt" data-speed="2">2x</button>
+          <button class="chip-btn speed-opt" data-speed="3">3x</button>
+        </div>
+      </div>
+      <div class="hint">Trim: timeline pe clip ke kinare khisko. Reorder: clip ko dabake drag karo.</div>
+    </div>
+  </div>
+
+  <div class="panel hidden" id="panel-text">
+    <div class="panel-head"><span>Text</span><button class="panel-close">✕</button></div>
+    <div class="panel-body">
+      <div class="row-btns">
+        <button id="btn-add-text" class="chip-btn primary">+ Add text</button>
+        <button id="btn-auto-captions" class="chip-btn">🎙 Auto captions (AI)</button>
+      </div>
+      <details id="watermark-controls"><summary>Optional text watermark</summary><div class="hint">No forced app watermark. Add your own text as a transparent image layer across the current output. Reposition/size/rotate it in Overlay tools. Raster text, not an editable caption. Adding more clips later does not extend it automatically.</div><label class="mini-label">Text <input id="watermark-text" type="text" maxlength="80" value="Rahul_the_og"></label><div class="row-btns wrap"><label class="mini-label">Color <input id="watermark-color" type="color" value="#ffffff"></label><label class="mini-label">Opacity <input id="watermark-opacity" type="number" class="num" min="10" max="100" value="65"></label></div><button id="watermark-add" class="chip-btn">Add my watermark layer</button><div id="watermark-status" class="hint" role="status"></div></details><div id="captions-status" class="hint"></div>
+      <div id="text-list"></div>
+      <div id="text-editor" class="hidden">
+        <input id="te-content" type="text" placeholder="Apna text likho (Hindi/English)">
+        <div class="row-btns">
+          <select id="te-font" class="sel">
+            <option value="NotoSans">Noto Sans</option>
+            <option value="NotoSansDevanagari">Devanagari</option>
+          </select>
+          <input id="te-color" type="color" value="#ffffff" title="Color">
+          <select id="te-anim" class="sel">
+            <option value="none">No animation</option>
+            <option value="fade">Fade in</option>
+            <option value="rise">Rise up</option>
+            <option value="blink">Blink</option>
+          </select>
+        </div>
+        <label class="mini-label">Size <input id="te-size" type="range" min="20" max="120" value="52"></label>
+        <label class="mini-label">Horizontal center % <input id="te-posx" type="range" min="5" max="95" value="50"></label><label class="mini-label">Vertical position <input id="te-posy" type="range" min="5" max="90" value="75"></label>
+        <div class="row-btns">
+          <label class="mini-label">Start <input id="te-start" type="number" min="0" step="0.5" value="0" class="num"></label>
+          <label class="mini-label">End <input id="te-end" type="number" min="0" step="0.5" value="3" class="num"></label>
+        </div>
+        <div class="row-btns wrap">
+          <button id="te-duplicate" class="chip-btn">Duplicate text</button><button id="te-done" class="chip-btn primary">Done</button>
+          <button id="te-delete" class="chip-btn danger">Delete text</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel hidden" id="panel-music">
+    <div class="panel-head"><span>Audio</span><button class="panel-close">✕</button></div>
+    <div class="panel-body">
+      <div class="row-btns">
+        <button id="btn-add-music" class="chip-btn primary">+ Add music</button>
+        <button id="btn-remove-music" class="chip-btn danger hidden">Remove</button>
+      </div>
+      <label class="mini-label">Voice effect (export) <select id="voice-effect" class="sel"><option value="none">Original</option><option value="high">High pitch</option><option value="deep">Deep voice</option><option value="radio">Radio</option><option value="echo">Echo</option></select></label><div class="hint">Voice presets original clip audio pe lagte hain, added music pe nahi. Preview original audio hai.</div><div class="row-btns wrap"><button id="btn-beats" class="chip-btn">Suggest beat markers</button><button id="btn-cut-beats" class="chip-btn">Split at markers</button></div><div class="row-btns wrap"><label class="mini-label">Marker seconds <input id="beat-time" class="num" type="number" min="0" step="0.01" value="0"></label><button id="beat-add" class="chip-btn">+ Marker</button><button id="beat-add-playhead" class="chip-btn">+ At playhead</button><button id="beat-clear" class="chip-btn">Clear markers</button></div><div id="beat-review"></div><div id="beat-status" class="hint">On-device energy peaks, not perfect beat sync. Max 2 min music, 100 markers. Review before splitting.</div><div id="music-info" class="hint">Koi music nahi. MP3/audio file add karo.</div>
+      <label class="mini-label hidden" id="mv-wrap">Music volume <input id="music-volume" type="range" min="0" max="100" value="70"></label>
+      <div class="row-btns wrap"><label class="mini-label">Music source start (s) <input id="music-source-start" class="num" type="number" min="0" step="0.01" value="0"></label><button id="music-source-apply" class="chip-btn">Set music start</button></div><div id="music-source-status" class="hint" role="status">Skip the beginning of added music. Starts at project time0; no loop or timeline offset. Source length check after audio loads.</div><label class="toggle-row"><input type="checkbox" id="chk-mute"> Original video sound band karo</label>
+    </div>
+  </div>
+
+  <div class="panel hidden" id="panel-filters">
+    <div class="panel-head"><span>Effects</span><button class="panel-close">✕</button></div>
+    <div class="panel-body"><div class="row-btns wrap" id="filter-list"></div>
+      <details id="color-adjust-controls"><summary>Adjust color</summary><label class="mini-label">Brightness <input id="adjust-brightness" type="range" min="-30" max="30" value="0"><output id="adjust-brightness-value">0</output></label><label class="mini-label">Contrast <input id="adjust-contrast" type="range" min="50" max="150" value="100"><output id="adjust-contrast-value">100</output></label><label class="mini-label">Saturation <input id="adjust-saturation" type="range" min="0" max="200" value="100"><output id="adjust-saturation-value">100</output></label><button id="adjust-reset" class="chip-btn">Reset adjustments</button><div class="hint">Applied after the selected look, before text/image layers. Export values are exact renderer controls; browser preview is an approximation. Saved per project, Undo available.</div></details><label class="toggle-row"><input type="checkbox" id="chk-fades"> Fade in / fade out</label><div class="row-btns wrap"><label class="mini-label">In seconds <input id="fade-in-seconds" class="num" type="number" min="0" max="10" step="0.1" value="0.6"></label><label class="mini-label">Out seconds <input id="fade-out-seconds" class="num" type="number" min="0" max="10" step="0.1" value="0.6"></label><button id="fade-time-apply" class="chip-btn">Set fade times</button></div><div id="fade-time-status" class="hint" role="status">Rendered preview/export only. Base video and mixed audio fade together, text/image layers stay visible. Each edge capped at one quarter of output.0 skips an edge.</div>
+    </div>
+  </div>
+
+  <div class="panel hidden" id="panel-templates">
+    <div class="panel-head"><span>Styles (templates)</span><button class="panel-close">✕</button></div>
+    <div class="panel-body"><div class="row-btns wrap" id="template-list"></div>
+      <div class="row-btns">
+        <button id="btn-save-template" class="chip-btn">💾 Save current look</button>
+        <button id="btn-import-template" class="chip-btn">📥 Import template</button>
+      </div>
+      <textarea id="template-import-box" class="hidden" rows="4" placeholder="Template JSON yahan paste karo" style="background:var(--bg2);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:10px;font-size:12px;width:100%;"></textarea>
+      <div class="hint">Style ek tap mein filter + animation + fades set kar deta hai. Apna style save karo ya doston ka template JSON import karo.</div>
+    </div>
+  </div>
+
+  <div class="panel hidden" id="panel-ai">
+    <div class="panel-head"><span>🪄 AI Edit</span><button class="panel-close">✕</button></div>
+    <div class="panel-body">
+      <div id="ai-status" class="hint"></div>
+      <div class="ai-input-row">
+        <input id="ai-input" type="text" placeholder='Jaise: "trim clip 1 from 2s to 6s" ya "add caption Hello from 1s to 4s"'>
+        <button id="ai-send" class="chip-btn primary">Go</button>
+      </div>
+      <div id="ai-reply" class="ai-reply"></div>
+      <div id="ai-plan" class="hidden">
+        <div class="mini-label">AI ye karega:</div>
+        <ul id="ai-plan-list"></ul>
+        <div class="row-btns">
+          <button id="ai-apply" class="chip-btn primary">Apply</button>
+          <button id="ai-cancel" class="chip-btn">Cancel</button>
+        </div>
+      </div>
+      <details class="ai-help"><summary>Kya kya samajhta hai?</summary>
+        <div id="ai-help-body" class="hint"></div>
+      </details>
+      <div class="row-btns"><button id="btn-ai-settings" class="chip-btn">⚙ AI settings</button></div>
+      <div id="ai-settings" class="hidden">
+        <div class="hint">Free Gemini key <b>aistudio.google.com/apikey</b> se banao (Google account se, bilkul free) aur yahan paste karo. Key sirf is device pe save hoti hai, kahin upload nahi hoti.</div>
+        <div class="ai-input-row">
+          <input id="ai-key" type="password" placeholder="Gemini API key paste karo" autocomplete="off">
+          <button id="ai-key-save" class="chip-btn">Save</button>
+        </div>
+        <div id="ai-key-status" class="hint"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Export sheet -->
+  <div class="panel hidden" id="panel-export">
+    <div class="panel-head"><span>Export</span><button class="panel-close">✕</button></div>
+    <div class="panel-body">
+      <div class="row-btns wrap">
+        <button class="chip-btn q-opt sel" data-q="480p30">480p 30fps · fast</button>
+        <button class="chip-btn q-opt" data-q="720p30">720p 30fps</button>
+        <button class="chip-btn q-opt" data-q="720p60">720p 60fps</button>
+        <button class="chip-btn q-opt" data-q="1080p60">1080p 60fps · heavy</button>
+      </div>
+      <div class="hint">2K/4K aur 120 FPS is web app mein reliably nahi ban sakta (phone ki memory aur speed limit). Wo PC/native version ka kaam hai - baad mein. 1080p60 bhi slow phone pe bahut der sakta hai. Quality source se upar nahi jayegi - chhota clip 1080p mein upscale hoga, sharp nahi hoga.</div>
+      <div id="export-progress" class="hidden">
+        <div class="progress-track"><div id="export-bar"></div></div>
+        <div id="export-msg" class="hint">Starting...</div>
+      </div>
+      <button id="btn-start-export" class="chip-btn primary big">Start export</button>
+      <div class="hint">Processing phone par hi hoti hai - video kahin upload nahi hoti. Lambi video mein thoda time lag sakta hai.</div>
+    </div>
+  </div>
+
+  <input type="file" id="file-video" accept="video/*,image/*" multiple class="hidden">
+  <input type="file" id="file-music" accept="audio/*" class="hidden">
+
+  <footer id="credit">Made by Rahul_the_og</footer>
+</div>
+<script src="vendor/ffmpeg.js"></script>
+<script src="js/motion.js"></script>
+<script src="js/adjustments.js"></script>
+<script src="js/editor.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/backup.js"></script>
+<script src="js/tracking.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
