@@ -33,7 +33,7 @@ with sync_playwright() as p:
     page.evaluate("""(pid)=>{const snap=JSON.parse(window.__alya.snapshot());
       snap.texts.push({id:9001,content:'Recovered Line',font:'NotoSans',size:52,color:'#ffffff',posY:75,anim:'none',start:0,end:3});
       localStorage.setItem('ms_recovery',JSON.stringify({id:pid,at:Date.now(),snap:JSON.stringify(snap)}));}""",pid)
-    page.evaluate("""async(pid)=>{const db=await new Promise((res,rej)=>{const q=indexedDB.open('alya-editing',1);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error);});
+    page.evaluate("""async(pid)=>{const db=await new Promise((res,rej)=>{const q=indexedDB.open('minecraft-studio',1);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error);});
       await new Promise((res,rej)=>{const tx=db.transaction('projects','readwrite');const g=tx.objectStore('projects').get(pid);
       g.onsuccess=()=>{const rec=g.result;rec.updatedAt=1;rec.snap=rec.snap.replace('Crash Edit','Old Edit');tx.objectStore('projects').put(rec);};tx.oncomplete=res;tx.onerror=()=>rej(tx.error);});db.close();}""",pid)
     page.evaluate("(pid)=>window.__alya.openProject(pid)",pid)  # evaluate awaits the open

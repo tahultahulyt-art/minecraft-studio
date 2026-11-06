@@ -1574,7 +1574,7 @@ showHome();
       if (tile.dataset.soon) { toast(tile.querySelector('.tile-name, small') ? (tile.querySelector('.tile-name') || tile.querySelector('small')).textContent + ' — coming soon' : 'Coming soon'); return; }
       if (tile.dataset.scroll === 'top') { window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
       if (tile.dataset.scroll === 'projects') { const h = $id('home-projects-head'); if (h) h.scrollIntoView({ behavior: 'smooth' }); return; }
-      if (tile.dataset.panel) { startProject(); setTimeout(() => togglePanel(tile.dataset.panel), 80); }
+      if (tile.dataset.toolPanel) { startProject(); setTimeout(() => togglePanel(tile.dataset.toolPanel), 80); }
     });
   });
   const st = $id('btn-home-search'), si = $id('home-search');
