@@ -4,7 +4,7 @@ with sync_playwright() as p:
     browser=p.chromium.launch(executable_path=os.getenv('CHROME','/usr/bin/google-chrome'),headless=True,args=['--no-sandbox'])
     page=browser.new_page(viewport={'width':412,'height':915});page.goto(base);page.click('#btn-new-project');page.wait_for_selector('#app:not(.hidden)')
     page.evaluate('''()=>{window.originalImage=window.Image;window.originalTimeout=window.setTimeout;window.Image=class{set src(v){this.value=v;}get src(){return this.value;}};window.setTimeout=(fn,ms,...a)=>window.originalTimeout(fn,ms===15000?20:ms,...a);}''')
-    page.set_input_files('#file-video',str(ROOT/'test-assets/photo.jpg'));page.wait_for_function('document.querySelector("#ai-reply").textContent.includes("load nahi")')
+    page.set_input_files('#file-video',str(ROOT/'test-assets/photo.jpg'));page.wait_for_function('document.querySelector("#ai-reply").textContent.includes("failed to load")')
     assert page.evaluate('window.__alya.state.clips.length')==0
     assert not page.locator('#btn-home').is_disabled()
     assert page.locator('#stage-spinner').evaluate('e=>e.classList.contains("hidden")')

@@ -6,7 +6,7 @@ with sync_playwright() as p:
     page.route('https://appassets.androidplatform.net/assets/www/**',lambda r:r.fulfill(response=page.request.get(base+r.request.url.split('/assets/www/',1)[1])))
     page.goto('https://appassets.androidplatform.net/assets/www/index.html');page.click('#btn-new-project');page.wait_for_selector('#app:not(.hidden)');page.set_input_files('#file-video',str(ROOT/'test-assets/photo.jpg'));page.wait_for_function('window.__alya.state.clips.length===1')
     page.evaluate('()=>{window.engineCalled=false;Exporter.exportVideo=async()=>{window.engineCalled=true;return new Blob()}}')
-    page.click('#btn-export');page.click('#btn-start-export');page.wait_for_function('document.querySelector("#export-msg").textContent.includes("WebView update")')
+    page.click('#btn-export');page.click('#btn-start-export');page.wait_for_function('document.querySelector("#export-msg").textContent.includes("Update Android System WebView")')
     assert not page.evaluate('window.engineCalled')
     assert not page.locator('#btn-start-export').is_disabled()
     page.screenshot(path='/downloads/native-unsupported.png')

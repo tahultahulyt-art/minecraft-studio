@@ -13,7 +13,7 @@ with sync_playwright() as p:
     page.evaluate("()=>{AIEdit.askGemini=()=>new Promise(r=>window.finishPlan=r);}")
     page.locator('#ai-input').fill('warm filter');page.click('#ai-send');page.wait_for_function('typeof window.finishPlan==="function"')
     page.evaluate("window.__alya.applyOps([{do:'filter',name:'cool'}]);window.finishPlan({ops:[{do:'filter',name:'warm'}],reply:'fixture'})")
-    page.wait_for_function('document.querySelector("#ai-reply").textContent.includes("edit ho gaya")')
+    page.wait_for_function('document.querySelector("#ai-reply").textContent.includes("was edited")')
     assert page.locator('#ai-plan').evaluate('e=>e.classList.contains("hidden")')
     assert page.evaluate('window.__alya.state.filter')=='cool'
     page.evaluate("AIEdit.getKey=()=>''")

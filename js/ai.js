@@ -102,10 +102,10 @@ const AIEdit = (() => {
     }
 
     if (!ops.length) {
-      return { ops: [], reply: 'Ye command samajh nahi aayi. Neeche "Kya kya samajhta hai?" mein examples hain. AI key lagao to free-form English/Hindi bhi chalegi.' };
+      return { ops: [], reply: 'I did not understand that command. See the examples in "What it understands" below. Add an AI key for free-form English.' };
     }
-    let reply = ops.length + ' kaam samjha';
-    if (notes.length) reply += ', par ye nahi samjha: "' + notes.join('", "') + '"';
+    let reply = 'Understood ' + ops.length + ' action(s)';
+    if (notes.length) reply += ', but did not understand: "' + notes.join('", "') + '"';
     return { ops, reply };
   }
 
@@ -170,19 +170,19 @@ Rules: clip numbers are 1-based. Times are seconds. If the instruction is unclea
         const txt = (((j.candidates || [])[0] || {}).content || {}).parts?.[0]?.text || '';
         const clean = txt.replace(/```json|```/g, '').trim();
         const ops = JSON.parse(clean);
-        if (!Array.isArray(ops)) return { ops: [], reply: 'AI ne koi valid plan nahi diya. Dobara try karo.' };
+        if (!Array.isArray(ops)) return { ops: [], reply: 'The AI did not return a valid plan. Try again.' };
         validateOps(ops);
-        if (!ops.length) return { ops: [], reply: 'AI ko ye request is editor ke features mein convert nahi ho payi.' };
-        return { ops, reply: 'AI plan tayyar hai. Check karke Apply dabao.' };
+        if (!ops.length) return { ops: [], reply: 'The AI could not convert this request into editor features.' };
+        return { ops, reply: 'AI plan ready. Check it, then press Apply.' };
       } catch (e) {
-        if (e instanceof SyntaxError) return { ops: [], reply: 'AI ka reply parse nahi hua. Dobara try karo.' };
+        if (e instanceof SyntaxError) return { ops: [], reply: 'Could not parse the AI reply. Try again.' };
         lastErr = e;
       }
     }
     const msg = String(lastErr && lastErr.message || lastErr);
-    if (/quota|rate|429/i.test(msg)) return { ops: [], reply: 'Free tier ki limit pahunch gayi. Thodi der baad try karo. (Free tier: per-minute requests limited hoti hain)' };
-    if (/API key|403|400/.test(msg)) return { ops: [], reply: 'API key mein problem hai. Settings mein key check karo (aistudio.google.com/apikey se banai ho).' };
-    return { ops: [], reply: 'AI se connect nahi ho paya: ' + msg };
+    if (/quota|rate|429/i.test(msg)) return { ops: [], reply: 'Free tier limit reached. Try again in a while. (Free tier: per-minute requests are limited)' };
+    if (/API key|403|400/.test(msg)) return { ops: [], reply: 'There is a problem with the API key. Check the key in Settings (create one at aistudio.google.com/apikey).' };
+    return { ops: [], reply: 'Could not connect to the AI: ' + msg };
   }
 
   async function blobToBase64(blob) {
@@ -224,20 +224,20 @@ Rules: 2-6 words per segment, segments 1-4 seconds long, times in seconds relati
         if (!Array.isArray(segs)) throw new Error('bad json');
         return { segments: segs.slice(0,2000).filter(x => x&&Number.isFinite(x.start)&&Number.isFinite(x.end)&&x.start>=0&&x.end>x.start&&x.end<=86400&&typeof x.text==='string'&&x.text.length>0&&x.text.length<=1000) };
       } catch (e) {
-        if (e instanceof SyntaxError || e.message === 'bad json') return { error: 'AI ka transcript samajh nahi aaya. Dobara try karo.' };
+        if (e instanceof SyntaxError || e.message === 'bad json') return { error: 'Could not understand the AI transcript. Try again.' };
         lastErr = e;
       }
     }
     const msg = String(lastErr && lastErr.message || lastErr);
-    if (/quota|rate|429/i.test(msg)) return { error: 'Free tier limit aa gayi. Thodi der baad try karo.' };
-    if (/API key|403|400/.test(msg)) return { error: 'API key mein problem hai. Settings mein check karo.' };
+    if (/quota|rate|429/i.test(msg)) return { error: 'Free tier limit reached. Try again in a while.' };
+    if (/API key|403|400/.test(msg)) return { error: 'There is a problem with the API key. Check it in Settings.' };
     return { error: 'Captions fail: ' + msg };
   }
 
   function getKey() { try { return localStorage.getItem(KEY_LS) || ''; } catch (e) { return ''; } }
   function setKey(k) { try { k ? localStorage.setItem(KEY_LS, k) : localStorage.removeItem(KEY_LS); } catch (e) {} }
 
-  const HELP = `Offline commands (key ke bina chalte hain):
+  const HELP = `Offline commands (work without a key):
 • trim clip 1 from 2s to 6s
 • add caption Hello from 1s to 4s
 • black and white filter / warm filter
@@ -248,8 +248,8 @@ Rules: 2-6 words per segment, segments 1-4 seconds long, times in seconds relati
 • music volume 50
 • template cinematic
 
-Gemini AI key lagao to free-form likh sakte ho, jaise:
-"pehli clip aadhi karo, retro look do, aur end mein thanks likho"`;
+Add a Gemini AI key to write free-form, like:
+"trim the first clip to half, give it a retro look, and write thanks at the end"`;
 
   return { validateOps, parseOffline, askGemini, transcribeAudio, getKey, setKey, HELP, parseTime };
 })();

@@ -15,13 +15,13 @@ function data(v,image=false){
 async function encode(file){return await new Promise((r,j)=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.onerror=()=>j(Error('Media read failed'));fr.readAsDataURL(file);});}
 async function pack(name,snap,files){
  let size=new Blob([snap]).size;for(const f of files)size+=f.file.size;
- if(size>LIMIT)throw Error('Backup limit 20MB (media + project). Chhota project use karo.');
+ if(size>LIMIT)throw Error('Backup limit 20MB (media + project). Use a smaller project.');
  const media=[];for(const f of files)media.push({id:f.id,name:f.file.name||'media',data:await encode(f.file)});
  return new Blob([JSON.stringify({format:'alya-project',version:1,name,snapshot:JSON.parse(snap),media})],{type:'application/json'});
 }
 async function unpack(file){
  if(file.size>30*1024*1024)throw Error('Backup file limit 30MB');
- const b=JSON.parse(await file.text());if(b.format!=='alya-project'||b.version!==1)throw Error('Minecraft Studio backup v1 chahiye');
+ const b=JSON.parse(await file.text());if(b.format!=='alya-project'||b.version!==1)throw Error('A Minecraft Studio v1 backup is required');
  const name=text(b.name,120),s=b.snapshot;if(!s||!Array.isArray(s.clips)||s.clips.length>100||!Array.isArray(b.media)||b.media.length>101)throw Error('Invalid project');
  const files=new Map();let size=0;
  for(const m of b.media){const k=id(m.id);if(files.has(k))throw Error('Duplicate media');const d=data(m.data);size+=d.bytes.length;if(size>LIMIT)throw Error('Backup limit 20MB');files.set(k,new File([d.bytes],text(m.name,255),{type:d.type}));}

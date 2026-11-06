@@ -86,7 +86,7 @@ function loadPreviewFonts() {
 let importingMedia=false;
 async function importFiles(fileList) {
   const files=Array.from(fileList);if(!files.length||importingMedia)return;
-  importingMedia=true;$('#btn-home').disabled=true;showSpinner('Clips import ho rahi hain...');pushUndo();
+  importingMedia=true;$('#btn-home').disabled=true;showSpinner('Importing clips...');pushUndo();
   let failed=0;
   try{
     for(const file of files){
@@ -100,7 +100,7 @@ async function importFiles(fileList) {
       }catch(e){failed++;URL.revokeObjectURL(clip.url);projectUrls.delete(clip.url);mediaUrls.delete(file);console.warn('Media import failed',e);}
     }
     if(state.clips.length){$('#empty-state').classList.add('hidden');selectedClipId=state.clips[0].id;}
-    if(failed)flashReply(failed+' file(s) load nahi hui. Valid MP4/MOV/video ya photo try karo.');
+    if(failed)flashReply(failed+' file(s) failed to load. Try a valid MP4/MOV/video or photo.');
     refreshAll();scheduleSave();
   }finally{importingMedia=false;$('#btn-home').disabled=false;hideSpinner();}
 }
@@ -364,7 +364,7 @@ function renderOverlays() {
   renderImageOverlays();
   const slot = $('#text-overlay-slot');
   const sc = stageScale();
-  // low-end: skip DOM rebuild jab tak visible set/style same hai (play pe 10x/sec call hota hai)
+  // low-end: skip DOM rebuild while the visible set/style is unchanged (called 10x/sec during play)
   const vis = state.texts.filter(t => playhead >= t.start && playhead <= t.end);
   const sig = slot.clientWidth + '|' + vis.map(t => [t.id, t.content, t.color, t.size, t.posX, t.posY, t.anim, t.font].join(',')).join('|');
   if (sig === ovSig) return;
@@ -386,14 +386,14 @@ function renderOverlays() {
 /* ---------- ops (shared by UI and AI) ---------- */
 function opLabel(op) {
   switch (op.do) {
-    case 'trim': return `Clip ${op.clip} ko ${op.start}s - ${op.end}s trim karo`;
-    case 'split': return `Clip ${op.clip} ko ${op.at}s pe split karo`;
-    case 'delete': return `Clip ${op.clip} delete karo`;
-    case 'speed': return `Clip ${op.clip} ki speed ${op.value}x karo`;
+    case 'trim': return `Trim clip ${op.clip} to ${op.start}s - ${op.end}s`;
+    case 'split': return `Split clip ${op.clip} at ${op.at}s`;
+    case 'delete': return `Delete clip ${op.clip}`;
+    case 'speed': return `Set clip ${op.clip} speed to ${op.value}x`;
     case 'text': return `Text "${op.content}" (${op.start}s - ${op.end}s)`;
-    case 'removeText': return `Text #${op.index} hatao`;
+    case 'removeText': return `Remove text #${op.index}`;
     case 'filter': return `Filter: ${op.name}`;
-    case 'mute': return op.value ? 'Original sound band' : 'Original sound on';
+    case 'mute': return op.value ? 'Original sound muted' : 'Original sound on';
     case 'fades': return op.value ? 'Fade in/out on' : 'Fade in/out off';
     case 'musicvol': return `Music volume ${op.value}%`;
     case 'template': return `Style: ${op.name}`;
@@ -417,16 +417,16 @@ function applyOp(op) {
   const c = state.clips[i];
   switch (op.do) {
     case 'trim':
-      if (!c) return 'Clip ' + op.clip + ' nahi hai';
-      if (c.kind === 'image') return 'Photo ke seconds Clip tools mein set karo';
+      if (!c) return 'Clip ' + op.clip + ' not found';
+      if (c.kind === 'image') return 'Set the photo seconds in Clip tools';
       c.trimStart = Math.max(0, Math.min(op.start, c.srcDuration - 0.2));
       c.trimEnd = Math.min(Math.max(op.end, c.trimStart + 0.2), c.srcDuration);
       return null;
     case 'split': {
-      if (!c) return 'Clip ' + op.clip + ' nahi hai';
-      if (c.kind === 'image') return 'Photo split nahi hoti';
+      if (!c) return 'Clip ' + op.clip + ' not found';
+      if (c.kind === 'image') return 'Photos cannot be split';
       const at = op.at;
-      if (at <= c.trimStart + 0.1 || at >= c.trimEnd - 0.1) return 'Split point trim range ke bahar hai';
+      if (at <= c.trimStart + 0.1 || at >= c.trimEnd - 0.1) return 'Split point is outside the trim range';
       const second = { ...c, id: nextId++, trimStart: at, thumbs: c.thumbs };
       fileStore[second.id] = c.file; thumbStore[second.id] = c.thumbs;
       c.trimEnd = at;
@@ -434,16 +434,16 @@ function applyOp(op) {
       return null;
     }
     case 'delete':
-      if (!c) return 'Clip ' + op.clip + ' nahi hai';
+      if (!c) return 'Clip ' + op.clip + ' not found';
       state.clips.splice(i, 1);
       if (selectedClipId === c.id) selectedClipId = state.clips[0] ? state.clips[0].id : null;
       return null;
     case 'speed':
-      if (!c) return 'Clip ' + op.clip + ' nahi hai';
+      if (!c) return 'Clip ' + op.clip + ' not found';
       c.speed = Math.min(4, Math.max(0.5, op.value));
       return null;
     case 'text':
-      if((op.start??0)>=Math.max(totalDur(),3))return 'Text start project duration ke bahar hai';
+      if((op.start??0)>=Math.max(totalDur(),3))return 'Text start is beyond the project duration';
       state.texts.push({
         id: nextId++, content: op.content || 'Text', font: /[\u0900-\u097F]/.test(op.content || '') ? 'NotoSansDevanagari' : 'NotoSans',
         size: op.size || 52, color: op.color || '#ffffff', posY: op.posY ?? 75,
@@ -454,16 +454,16 @@ function applyOp(op) {
       state.texts.splice((op.index || 1) - 1, 1);
       return null;
     case 'filter':
-      if (!Exporter.FILTERS[op.name]) return 'Filter "' + op.name + '" nahi hai';
+      if (!Exporter.FILTERS[op.name]) return 'Filter "' + op.name + '" not found';
       state.filter = op.name;
       return null;
     case 'mute': state.muted = !!op.value; return null;
     case 'fades': state.fades = !!op.value; return null;
     case 'transitions': state.transitions = !!op.value; return null;
-    case 'musicvol': if (state.music) state.music.volume = (op.value ?? 70) / 100; return state.music ? null : 'Pehle music add karo';
+    case 'musicvol': if (state.music) state.music.volume = (op.value ?? 70) / 100; return state.music ? null : 'Add music first';
     case 'template': {
       const t = TEMPLATES[(op.name || '').toLowerCase()];
-      if (!t) return 'Style "' + op.name + '" nahi hai. Options: ' + Object.keys(TEMPLATES).join(', ');
+      if (!t) return 'Style "' + op.name + '" not found. Options: ' + Object.keys(TEMPLATES).join(', ');
       state.filter = t.filter; state.fades = t.fades;
       state.texts.forEach(x => { x.anim = t.anim; if (t.textColor) x.color = t.textColor; if (t.textSize) x.size = t.textSize; });
       return null;
@@ -544,9 +544,9 @@ $('#clip-volume-apply').onclick=()=>{const c=state.clips.find(c=>c.id===selected
 for(const axis of ['x','y'])$('#btn-flip-'+axis).onclick=()=>{const c=state.clips.find(c=>c.id===selectedClipId);if(!c)return;pushUndo();const key=axis==='x'?'flipX':'flipY';c[key]=!c[key];refreshAll();scheduleSave();};
 $('#btn-split').addEventListener('click', () => {
   const info = clipAtTime(Math.min(playhead,Math.max(0,totalDur()-.001)));
-  if (!info || info.clip.kind !== 'video') {$('#clip-process-status').textContent='Video clip pe playhead rakho, phir split dabao';return;}
+  if (!info || info.clip.kind !== 'video') {$('#clip-process-status').textContent='Place the playhead on a video clip, then press split';return;}
   const errs=applyOps([{do:'split',clip:state.clips.indexOf(info.clip)+1,at:info.local}]);
-  $('#clip-process-status').textContent=errs.length?errs.join('; '):'Clip split ho gaya. Undo available.';
+  $('#clip-process-status').textContent=errs.length?errs.join('; '):'Clip split. Undo available.';
 });
 $('#btn-delete-clip').addEventListener('click', () => {
   const c = state.clips.find(x => x.id === selectedClipId);
@@ -558,7 +558,7 @@ $('#btn-delete-clip').addEventListener('click', () => {
 });
 $('#btn-photo-duration').addEventListener('click',()=>{
   const c=state.clips.find(x=>x.id===selectedClipId);
-  if(!c||c.kind!=='image'){$('#clip-process-status').textContent='Photo clip select karo.';return;}
+  if(!c||c.kind!=='image'){$('#clip-process-status').textContent='Select a photo clip.';return;}
   const seconds=Number($('#photo-duration').value);if(!Number.isFinite(seconds)||seconds<.2||seconds>60){$('#clip-process-status').textContent='Photo duration 0.2 se 60 seconds rakho.';return;}
   pushUndo();c.srcDuration=seconds;c.trimStart=0;c.trimEnd=seconds;c.speed=1;playhead=Math.min(playhead,totalDur());refreshAll();scheduleSave();$('#clip-process-status').textContent='Photo duration '+seconds+'s. Undo available.';
 });
@@ -592,7 +592,7 @@ function renderTextList() {
 }
 $('#btn-add-text').addEventListener('click', () => {
   pushUndo();
-  const t = { id: nextId++, content: 'Apna text', font: 'NotoSans', size: 52, color: '#ffffff', posY: 75, anim: 'none', start: Math.floor(playhead), end: Math.min(Math.floor(playhead) + 3, Math.max(totalDur(), 3)) };
+  const t = { id: nextId++, content: 'Your text', font: 'NotoSans', size: 52, color: '#ffffff', posY: 75, anim: 'none', start: Math.floor(playhead), end: Math.min(Math.floor(playhead) + 3, Math.max(totalDur(), 3)) };
   state.texts.push(t);
   refreshAll();
   openTextEditor(t.id);
@@ -653,12 +653,12 @@ function renderMusicUI() {
   const has = !!state.music;
   $('#btn-remove-music').classList.toggle('hidden', !has);
   $('#mv-wrap').classList.toggle('hidden', !has);
-  $('#music-info').textContent = has ? ('♫ ' + state.music.name) : 'Koi music nahi. MP3/audio file add karo.';
+  $('#music-info').textContent = has ? ('♫ ' + state.music.name) : 'No music yet. Add an MP3/audio file.';
   if (has) $('#music-volume').value = Math.round(state.music.volume * 100);
   $('#music-source-start').value=has?(state.music.sourceStart||0):0;$('#music-source-start').disabled=$('#music-source-apply').disabled=!has;
   $('#chk-mute').checked = state.muted;
 }
-$('#music-source-apply').onclick=()=>{if(!state.music)return;const raw=$('#music-source-start').value,start=Number(raw);if(!raw.trim()||!Number.isFinite(start)||start<0||!Number.isFinite(musicEl.duration)||start>=musicEl.duration){$('#music-source-status').textContent='Audio load hone do, phir source ke andar start seconds rakho.';return;}pushUndo();state.music.sourceStart=start;syncMusicPreview(true);scheduleSave();$('#music-source-status').textContent='Music source starts at '+start+'s, project time0. Source ends naturally; no loop. Undo available.';};
+$('#music-source-apply').onclick=()=>{if(!state.music)return;const raw=$('#music-source-start').value,start=Number(raw);if(!raw.trim()||!Number.isFinite(start)||start<0||!Number.isFinite(musicEl.duration)||start>=musicEl.duration){$('#music-source-status').textContent='Let the audio load, then set a start within the source seconds.';return;}pushUndo();state.music.sourceStart=start;syncMusicPreview(true);scheduleSave();$('#music-source-status').textContent='Music source starts at '+start+'s, project time0. Source ends naturally; no loop. Undo available.';};
 $('#btn-add-music').addEventListener('click', () => $('#file-music').click());
 $('#file-music').addEventListener('change', (e) => {
   const f = e.target.files[0];
@@ -680,23 +680,23 @@ $('#chk-mute').addEventListener('change', (e) => { pushUndo(); state.muted = e.t
 $('#btn-auto-captions').addEventListener('click', async () => {
   const status = $('#captions-status');
   if (!AIEdit.getKey()) {
-    status.textContent = 'Auto captions ke liye free Gemini AI key chahiye: AI Edit panel > AI settings mein lagao. (Captions cloud AI se bante hain, offline nahi ho sakte - video device pe hi rehti hai, sirf audio AI ko jaati hai.)';
+    status.textContent = 'Auto captions need a free Gemini AI key: add it in AI Edit panel > AI settings. (Captions are made by cloud AI and cannot work offline - the video stays on your device, only the audio goes to the AI.)';
     return;
   }
-  if (!state.clips.length) { status.textContent = 'Pehle clips add karo.'; return; }
+  if (!state.clips.length) { status.textContent = 'Add clips first.'; return; }
   const captionProjectId=currentProjectId,captionSnapshot=snapshot();const captionButton=$('#btn-auto-captions');captionButton.disabled=true;
-  status.textContent = 'Audio tayyar ho raha hai...';
+  status.textContent = 'Preparing audio...';
   try {
     const captionState={...state,clips:state.clips.map(c=>({...c}))};
     const wav = await Exporter.extractAudio(captionState, (m) => status.textContent = m);
-    status.textContent = 'AI se captions ban rahe hain (lambi audio = zyada time)...';
+    status.textContent = 'AI is generating captions (longer audio = more time)...';
     const res = await AIEdit.transcribeAudio(wav, AIEdit.getKey());
-    if(currentProjectId!==captionProjectId||captionSnapshot!==snapshot()){status.textContent='Project badal/edit ho gaya. Captions apply nahi kiye.';return;}
+    if(currentProjectId!==captionProjectId||captionSnapshot!==snapshot()){status.textContent='Project changed/edited. Captions were not applied.';return;}
     if (res.error) { status.textContent = res.error; return; }
-    if (!res.segments.length) { status.textContent = 'Audio mein speech nahi mili.'; return; }
+    if (!res.segments.length) { status.textContent = 'No speech found in the audio.'; return; }
     const duration=totalDur();
     const segments=res.segments.filter(seg=>Number.isFinite(seg.start)&&Number.isFinite(seg.end)&&seg.start>=0&&seg.start<duration&&seg.end>seg.start);
-    if(!segments.length){status.textContent='Project ke andar valid captions nahi mili. Dobara try karo.';return;}
+    if(!segments.length){status.textContent='No valid captions found within the project. Try again.';return;}
     pushUndo();
     for (const seg of segments) {
       state.texts.push({
@@ -706,7 +706,7 @@ $('#btn-auto-captions').addEventListener('click', async () => {
         start: seg.start, end: Math.min(duration,Math.max(seg.start+.01,seg.end)),
       });
     }
-    status.textContent = segments.length + ' captions add ho gaye. Neeche list se edit kar sakte ho.';
+    status.textContent = segments.length + ' captions added. Edit them in the list below.';
     renderTextList(); renderOverlays();
   } catch (e) {
     console.error(e);
@@ -715,7 +715,7 @@ $('#btn-auto-captions').addEventListener('click', async () => {
 });
 
 /* ---------- filters & templates ---------- */
-const FILTER_LABELS = { none: 'Normal', bright: 'Bright', contrast: 'Contrast+', vivid: 'Vivid', bw: 'B&W', warm: 'Warm', cool: 'Cool', vintage: 'Vintage', pixel: 'Pixel (export mein)' };
+const FILTER_LABELS = { none: 'Normal', bright: 'Bright', contrast: 'Contrast+', vivid: 'Vivid', bw: 'B&W', warm: 'Warm', cool: 'Cool', vintage: 'Vintage', pixel: 'Pixel (export only)' };
 function renderFilterChips() {
   const box = $('#filter-list'); box.innerHTML = '';
   Object.keys(Exporter.FILTERS).forEach(name => {
@@ -783,7 +783,7 @@ $('#btn-import-template').addEventListener('click', () => {
     box.value = ''; box.classList.add('hidden');
     renderTemplateChips();
   } catch (e) {
-    alert('Template JSON valid nahi hai. Format: {"name":"Mera Style","filter":"warm","fades":true,"anim":"rise"}');
+    alert('Template JSON is not valid. Format: {"name":"My Style","filter":"warm","fades":true,"anim":"rise"}');
   }
 });
 
@@ -793,7 +793,7 @@ function applyWorkspaceWallpaper(data){
  $('#btn-remove-bg').disabled=!data;
 }
 $('#side-projects').onclick=()=>$('#btn-home').click();
-$('#side-new').onclick=async()=>{if(importingMedia)return;if(confirm('Naya project banao? Current project device pe save rahega.')){clearTimeout(saveTimer);await saveChain;await saveCurrentProject();await newProject();}};
+$('#side-new').onclick=async()=>{if(importingMedia)return;if(confirm('Create a new project? The current project stays saved on this device.')){clearTimeout(saveTimer);await saveChain;await saveCurrentProject();await newProject();}};
 $('#side-templates').onclick=()=>togglePanel('templates');$('#side-effects').onclick=()=>togglePanel('filters');$('#side-ai').onclick=()=>togglePanel('ai');$('#side-settings').onclick=()=>togglePanel('settings');
 $('#quality-pill').onclick=()=>togglePanel('export');
 $('#btn-set-bg').onclick=()=>$('#file-bg').click();
@@ -805,7 +805,7 @@ $('#file-bg').onchange=async e=>{
  await new Promise((resolve,reject)=>{const timer=setTimeout(()=>{image.src='';reject(Error('Wallpaper decode timeout'));},15000);image.onload=()=>{clearTimeout(timer);resolve();};image.onerror=()=>{clearTimeout(timer);reject(Error('Wallpaper decode failed'));};image.src=url;});
  const scale=Math.min(1,1080/Math.max(dim.w,dim.h)),canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(dim.w*scale));canvas.height=Math.max(1,Math.round(dim.h*scale));canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height);
  const data=canvas.toDataURL('image/jpeg',.75);localStorage.setItem('ms_wallpaper_v1',data);applyWorkspaceWallpaper(data);$('#wallpaper-status').textContent='Wallpaper saved only on this device. Exported video unchanged.';
- }catch(err){$('#wallpaper-status').textContent='Wallpaper load/save nahi hui. Chhoti valid photo try karo.';}finally{if(url)URL.revokeObjectURL(url);}
+ }catch(err){$('#wallpaper-status').textContent='Wallpaper failed to load/save. Try a smaller valid photo.';}finally{if(url)URL.revokeObjectURL(url);}
 };
 try{const wallpaper=localStorage.getItem('ms_wallpaper_v1');applyWorkspaceWallpaper(wallpaper?.startsWith('data:image/')?wallpaper:null);}catch(e){applyWorkspaceWallpaper(null);}
 
@@ -813,10 +813,10 @@ try{const wallpaper=localStorage.getItem('ms_wallpaper_v1');applyWorkspaceWallpa
 function refreshAIStatus() {
   const hasKey = !!AIEdit.getKey();
   $('#ai-status').innerHTML = hasKey
-    ? '🪄 <b>Gemini AI connected</b> (free tier - kabhi kabhi limit lag sakti hai). Free-form likho ya offline commands use karo.'
-    : 'Abhi <b>offline commands</b> chal rahe hain (fixed set). Free AI key lagao (⚙ AI settings) to kuch bhi likh sakte ho.';
+    ? '🪄 <b>Gemini AI connected</b> (free tier - limits may apply sometimes). Write free-form or use offline commands.'
+    : 'Currently running <b>offline commands</b> (a fixed set). Add a free AI key (⚙ AI settings) to write anything.';
   $('#ai-help-body').textContent = AIEdit.HELP;
-  $('#ai-key-status').textContent = hasKey ? 'Key saved hai (is device pe).' : 'Koi key nahi hai.';
+  $('#ai-key-status').textContent = hasKey ? 'Key saved (on this device).' : 'No key set.';
 }
 function flashReply(msg) { $('#ai-reply').textContent = msg; if (openPanel !== 'ai') togglePanel('ai'); }
 let pendingOps = null;let pendingProject=null;let pendingSnapshot=null;let aiRequest=0;
@@ -824,7 +824,7 @@ async function runAI() {
   const text = $('#ai-input').value.trim();
   if (!text) return;
   const request=++aiRequest,project=currentProjectId,requestSnapshot=snapshot();pendingOps=null;
-  $('#ai-reply').textContent = 'Soch raha hoon...';
+  $('#ai-reply').textContent = 'Thinking...';
   $('#ai-plan').classList.add('hidden');
   const summary = JSON.stringify({
     duration: +totalDur().toFixed(1),
@@ -839,7 +839,7 @@ async function runAI() {
     result = AIEdit.parseOffline(text, state.clips.length);
   }
   if(request!==aiRequest||project!==currentProjectId)return;
-  if(requestSnapshot!==snapshot()){$('#ai-reply').textContent='Project edit ho gaya. Naya plan banao.';return;}
+  if(requestSnapshot!==snapshot()){$('#ai-reply').textContent='Project was edited. Make a new plan.';return;}
   if(result.ops?.length){try{AIEdit.validateOps(result.ops);}catch(e){result={ops:[],reply:e.message};}}
   $('#ai-reply').textContent = result.reply;
   if (result.ops && result.ops.length) {
@@ -853,10 +853,10 @@ $('#ai-send').addEventListener('click', runAI);
 $('#ai-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') runAI(); });
 $('#ai-apply').addEventListener('click', () => {
   if (!pendingOps) return;
-  if(pendingProject!==currentProjectId||pendingSnapshot!==snapshot()){pendingOps=null;$('#ai-plan').classList.add('hidden');$('#ai-reply').textContent='Project badal gaya. Naya plan banao.';return;}
+  if(pendingProject!==currentProjectId||pendingSnapshot!==snapshot()){pendingOps=null;$('#ai-plan').classList.add('hidden');$('#ai-reply').textContent='Project changed. Make a new plan.';return;}
   const errs = applyOps(pendingOps);
   $('#ai-plan').classList.add('hidden');
-  $('#ai-reply').textContent = errs.length ? ('Apply hua, par: ' + errs.join('; ')) : 'Done! Undo se wapas la sakte ho.';
+  $('#ai-reply').textContent = errs.length ? ('Applied with issues: ' + errs.join('; ')) : 'Done! Use Undo to revert.';
   pendingOps = null;
 });
 $('#ai-cancel').addEventListener('click', () => { $('#ai-plan').classList.add('hidden'); pendingOps = null; });
@@ -879,8 +879,8 @@ $('#btn-render-preview').onclick=()=>{pause();$('#preview-render-status').textCo
 $('#preview-close').onclick=closeRenderedPreview;
 $('#render-preview-dialog').addEventListener('cancel',e=>{e.preventDefault();closeRenderedPreview();});
 $('#preview-build').onclick=async()=>{
- if(renderingPreview)return;const status=$('#preview-render-status');if(!state.clips.length){status.textContent='Clips add karo.';return;}
- if(Exporter.outputDuration(state)>30){status.textContent='Preview limit30s output. Longer project ke liye Export use karo.';return;}
+ if(renderingPreview)return;const status=$('#preview-render-status');if(!state.clips.length){status.textContent='Add clips.';return;}
+ if(Exporter.outputDuration(state)>30){status.textContent='Preview limit: 30s output. Use Export for longer projects.';return;}
  const signature=snapshot(),project=currentProjectId,generation=++previewGeneration;
  const copy=JSON.parse(signature);copy.clips=state.clips.map(c=>({...c}));if(state.music)copy.music={...state.music};
  clearRenderedPreview();renderingPreview=true;$('#preview-build').disabled=true;status.textContent='Rendering on device... first engine load may take time.';
@@ -902,22 +902,22 @@ $('#btn-start-export').addEventListener('click', async () => {
   btn.disabled = true;
   $('#export-progress').classList.remove('hidden');
   const bar = $('#export-bar'), msg = $('#export-msg');
-  if(location.hostname==='appassets.androidplatform.net'&&typeof window.AlyaSave?.postMessage!=='function'){msg.textContent='Is Android WebView mein save support nahi hai. Android System WebView update karo ya browser version use karo.';btn.disabled=false;return;}
+  if(location.hostname==='appassets.androidplatform.net'&&typeof window.AlyaSave?.postMessage!=='function'){msg.textContent='Save is not supported in this Android WebView. Update Android System WebView or use the browser version.';btn.disabled=false;return;}
   try {
     pause();
-    msg.textContent = 'Engine load ho raha hai (pehli baar ~30MB download)...';
+    msg.textContent = 'Loading engine (~30MB download the first time)...';
     const exportState=JSON.parse(snapshot());exportState.clips=state.clips.map(c=>({...c}));if(state.music)exportState.music={...state.music};
     const blob = await Exporter.exportVideo(exportState, quality,
       (p) => { bar.style.width = Math.round(p * 100) + '%'; msg.textContent = 'Export: ' + Math.round(p * 100) + '%'; },
       (stageMsg) => { msg.textContent = stageMsg; });
     bar.style.width = '100%';
-    msg.textContent = 'Ho gaya! Download shuru...';
+    msg.textContent = 'Done! Starting download...';
     if (window.AlyaSave && typeof window.AlyaSave.postMessage === 'function') {
-      msg.textContent = 'Android save picker khul raha hai...';
+      msg.textContent = 'Opening Android save picker...';
       awaitingNativeSave=true;
       window.AlyaSave.postMessage('begin');
       for(let offset=0;offset<blob.size;offset+=98304){
-        if(!awaitingNativeSave)throw Error('Android save stopped. Dobara try karo.');
+        if(!awaitingNativeSave)throw Error('Android save stopped. Try again.');
         const bytes=new Uint8Array(await blob.slice(offset,offset+98304).arrayBuffer());
         let raw='';for(let i=0;i<bytes.length;i+=8192)raw+=String.fromCharCode.apply(null,bytes.subarray(i,i+8192));
         window.AlyaSave.postMessage('chunk:'+btoa(raw));
@@ -935,7 +935,7 @@ $('#btn-start-export').addEventListener('click', async () => {
     console.error(e);
     if(awaitingNativeSave){try{window.AlyaSave.postMessage('abort');}catch(ignored){}}
     awaitingNativeSave=false;
-    msg.textContent = 'Export fail hua: ' + (e.message || e) + ' - chhota/480p try karo.';
+    msg.textContent = 'Export failed: ' + (e.message || e) + ' - try a smaller/480p export.';
   } finally {
     btn.disabled = awaitingNativeSave;
   }
@@ -1058,7 +1058,7 @@ async function idbAllKeys(store) {
 let projectIndex=[];
 try{const value=JSON.parse(localStorage.getItem('ms_projects_index')||'[]');if(Array.isArray(value))projectIndex=value;}catch(e){}
 function loadIndex(){return projectIndex;}
-function saveIndex(list){projectIndex=list;try{localStorage.setItem('ms_projects_index',JSON.stringify(list));}catch(e){$('#storage-status').textContent='Index cache save nahi hua. Projects database se recover honge.';}}
+function saveIndex(list){projectIndex=list;try{localStorage.setItem('ms_projects_index',JSON.stringify(list));}catch(e){$('#storage-status').textContent='Index cache failed to save. Projects will be recovered from the database.';}}
 async function recoverIndex(){
   const db=await idbOpen();
   try{const records=await new Promise((resolve,reject)=>{const r=db.transaction('projects').objectStore('projects').getAll();r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
@@ -1145,8 +1145,8 @@ async function openProject(id) {
   clearTimeout(saveTimer);await saveChain;pause();
   let rec;
   try { rec = await idbGet('projects', id); } catch (e) { rec = null; }
-  if (!rec) { alert('Project nahi mila.'); return; }
-  showSpinner('Project khul raha hai...');
+  if (!rec) { alert('Project not found.'); return; }
+  showSpinner('Opening project...');
   try {
     let recovered = false;
     const j = JSON.parse(rec.snap),loadedFiles={};
@@ -1178,7 +1178,7 @@ async function openProject(id) {
     }
     currentProjectId = id; currentProjectName = rec.name;
     undoStack.length = 0; redoStack.length = 0; $('#btn-undo').disabled = true; $('#btn-redo').disabled = true;
-    if (missing) alert(missing + ' media file(s) nahi mili - wo clips hata diye gaye. Dobara add kar sakte ho.');
+    if (missing) alert(missing + ' media file(s) not found - those clips were removed. You can add them again.');
     showEditor();saveStatus(recovered ? 'Recovered unsaved changes from last session' : 'Saved on device');
     if (recovered) { saveRevision++; setTimeout(() => { saveCurrentProject().catch(e => console.warn('save failed', e)); }, 1500); }
   } finally { hideSpinner(); }
@@ -1194,9 +1194,9 @@ async function deleteProject(id) {
 }
 
 async function downloadBackup(id) {
-  if(window.AlyaSave)throw Error('Android backup download abhi supported nahi. Web browser use karo.');
+  if(window.AlyaSave)throw Error('Android backup download is not supported yet. Use a web browser.');
   await saveChain;
-  const rec=await idbGet('projects',id);if(!rec)throw Error('Project nahi mila');
+  const rec=await idbGet('projects',id);if(!rec)throw Error('Project not found');
   const j=JSON.parse(rec.snap),keys=[...new Set([...j.clips.map(c=>c.id),...(j.music?[j.music.fileId]:[])])],files=[];
   for(const k of keys){const f=await idbGet('files',id+':'+k);if(!f?.blob)throw Error('Media missing; backup incomplete');files.push({id:k,file:f.blob});}
   const blob=await AlyaBackup.pack(rec.name,rec.snap,files),url=URL.createObjectURL(blob);
@@ -1223,7 +1223,7 @@ function renderHome() {
   const el = $('#projects-list');
   el.innerHTML = '';
   if (!list.length) {
-    el.innerHTML = '<div class="proj-empty">Abhi koi project nahi.<br>Pehla project banao - sab kuch is phone pe save hoga.</div>';
+    el.innerHTML = '<div class="proj-empty">No projects yet.<br>Make your first project - everything is saved on this phone.</div>';
     return;
   }
   for (const p of list) {
@@ -1242,7 +1242,7 @@ function renderHome() {
         if (act.dataset.act === 'backup') {
           try { await downloadBackup(p.id); } catch(e) {alert('Backup fail: '+e.message);}
         } else if (act.dataset.act === 'delete') {
-          if (confirm('Delete karna hai "' + p.name + '"? Is device se hamesha ke liye hat jayega.')) {
+          if (confirm('Delete "' + p.name + '"? It will be permanently removed from this device.')) {
             await deleteProject(p.id); renderHome();
           }
         } else {
@@ -1266,7 +1266,7 @@ async function showHome() {
   $('#app').classList.add('hidden');
   $('#home-screen').classList.remove('hidden');
   document.body.classList.add('home-mode');
-  try{await saveChain;await recoverIndex();}catch(e){$('#storage-status').textContent='Project database read nahi hua: '+e.message;}
+  try{await saveChain;await recoverIndex();}catch(e){$('#storage-status').textContent='Could not read the project database: '+e.message;}
   renderHome();
 }
 function showEditor() {
@@ -1283,7 +1283,7 @@ $('#btn-home').addEventListener('click', async () => {
   if(importingMedia||mediaProcessBusy){flashReply('Media processing complete hone do.');return;}
   pause();
   clearTimeout(saveTimer);
-  try { await saveCurrentProject(); } catch (e) {alert('Project save nahi hua: '+e.message);return;}
+  try { await saveCurrentProject(); } catch (e) {alert('Project failed to save: '+e.message);return;}
   showHome();
 });
 window.addEventListener('pagehide', () => { if (currentProjectId) { writeRecoveryJournal(true); saveCurrentProject(); } });
@@ -1338,9 +1338,9 @@ function addImageLayer(data,name) {
   state.overlays.push(o); renderOverlayList(); renderImageOverlays();openOverlay(o.id);scheduleSave();
 }
 $('#watermark-add').onclick=async()=>{
- const text=$('#watermark-text').value.trim(),status=$('#watermark-status');if(!text||!state.clips.length){status.textContent='Text aur project clips pehle add karo.';return;}
+ const text=$('#watermark-text').value.trim(),status=$('#watermark-status');if(!text||!state.clips.length){status.textContent='Add text and project clips first.';return;}
  const opacity=Number($('#watermark-opacity').value);if(!Number.isFinite(opacity)||opacity<10||opacity>100){status.textContent='Opacity10-100 rakho.';return;}
- const project=currentProjectId,signature=snapshot(),button=$('#watermark-add');button.disabled=true;status.textContent='Local text layer ban rahi hai...';
+ const project=currentProjectId,signature=snapshot(),button=$('#watermark-add');button.disabled=true;status.textContent='Building local text layer...';
  try{const family=/[\u0900-\u097F]/.test(text)?'NotoSansDevPrev':'NotoSansPrev';await loadPreviewFonts();await document.fonts.load('48px "'+family+'"');if(project!==currentProjectId||signature!==snapshot()){status.textContent='Project changed. Add again.';return;}
  const c=document.createElement('canvas');c.width=1024;c.height=100;const ctx=c.getContext('2d');ctx.font='bold 48px "'+family+'"';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=$('#watermark-color').value;ctx.fillText(text,512,50,990);const rgba=ctx.getImageData(0,0,c.width,c.height);for(let i=3;i<rgba.data.length;i+=4)rgba.data[i]=Math.round(rgba.data[i]*opacity/100);ctx.putImageData(rgba,0,0);
  const oldPlayhead=playhead;addImageLayer(c.toDataURL('image/png'),'Watermark: '+text);const o=state.overlays[state.overlays.length-1];o.x=78;o.y=90;o.size=36;o.start=0;o.end=Exporter.outputDuration(state);playhead=oldPlayhead;renderImageOverlays();renderOverlayList();scheduleSave();closePanels();togglePanel('overlays');openOverlay(o.id);status.textContent='Watermark added as editable image layer. Undo available.';
@@ -1354,7 +1354,7 @@ $('#ov-file').onchange=async e=>{
   const f=e.target.files[0];e.target.value='';if(!f)return;
   const project=currentProjectId,url=URL.createObjectURL(f),img=new Image();
   img.onload=()=>{if(project!==currentProjectId){URL.revokeObjectURL(url);return;}const c=document.createElement('canvas'),sc=Math.min(1,768/Math.max(img.width,img.height));c.width=Math.max(1,Math.round(img.width*sc));c.height=Math.max(1,Math.round(img.height*sc));c.getContext('2d').drawImage(img,0,0,c.width,c.height);addImageLayer(c.toDataURL('image/png'),f.name);URL.revokeObjectURL(url);};
-  img.onerror=()=>{URL.revokeObjectURL(url);alert('Image read nahi hui. PNG/JPG try karo.');};img.src=url;
+  img.onerror=()=>{URL.revokeObjectURL(url);alert('Could not read the image. Try PNG/JPG.');};img.src=url;
 };
 $('#ov-add-emoji').onclick=()=>{
   const text=$('#ov-emoji').value.trim();if(!text)return;
@@ -1377,7 +1377,7 @@ function renderKeyframeControls(o){
   const label=document.createElement('span');label.textContent='◆ '+(i+1);row.append(label);
   for(const [field,name,value,min,max] of [['at','Time',k.at*duration,0,duration],['x','X',k.x,0,100],['y','Y',k.y,0,100],['size','Size %',k.size??o.size,5,90],['angle','Angle',k.angle??o.angle,-180,180]]){
    const wrap=document.createElement('label');wrap.textContent=name;const input=document.createElement('input');input.type='number';input.step='.01';input.min=min;input.max=max;input.value=Number(value.toFixed(3));input.setAttribute('aria-label',name+' point '+(i+1));
-   input.onchange=()=>{const v=Number(input.value);if(!Number.isFinite(v)||v<min||v>max){$('#ov-kf-status').textContent='Value allowed range ke bahar hai.';renderKeyframeControls(o);return;}const at=v/duration;
+   input.onchange=()=>{const v=Number(input.value);if(!Number.isFinite(v)||v<min||v>max){$('#ov-kf-status').textContent='Value is outside the allowed range.';renderKeyframeControls(o);return;}const at=v/duration;
     if(field==='at'&&o.keyframes.some((p,n)=>n!==i&&Math.abs(p.at-at)<.001)){$('#ov-kf-status').textContent='Points ka time alag rakho.';renderKeyframeControls(o);return;}
     pushUndo();k[field]=field==='at'?at:v;o.keyframes.sort((a,b)=>a.at-b.at);renderKeyframeControls(o);imageOverlaySignature='';renderImageOverlays();scheduleSave();$('#ov-kf-status').textContent='Point updated. Undo available.';
    };wrap.append(input);row.append(wrap);
@@ -1387,8 +1387,8 @@ function renderKeyframeControls(o){
 }
 $('#ov-kf-enable').onclick=()=>{const o=state.overlays.find(o=>o.id===selectedOverlay);if(!o)return;pushUndo();o.keyframes=AlyaMotion.points(o).map(k=>({...k}));o.motion=true;$('#ov-motion').checked=true;renderKeyframeControls(o);renderImageOverlays();scheduleSave();};
 $('#ov-kf-add').onclick=()=>{const o=state.overlays.find(o=>o.id===selectedOverlay);if(!o)return;const at=(playhead-o.start)/Math.max(.1,o.end-o.start);const p=AlyaMotion.points(o);
- if(at<0||at>1||p.some(k=>Math.abs(k.at-at)<.001)){$('#ov-kf-status').textContent='Layer ke andar naya time choose karo (panel band karke timeline seek karo).';return;}if(p.length>=8){$('#ov-kf-status').textContent='Maximum 8 points.';return;}
- pushUndo();const xy=AlyaMotion.position(o,playhead);o.keyframes=[...p.map(k=>({...k})),{at,...xy}].sort((a,b)=>a.at-b.at);o.motion=true;$('#ov-motion').checked=true;renderKeyframeControls(o);renderImageOverlays();scheduleSave();$('#ov-kf-status').textContent='Point added. X/Y edit karo.';};
+ if(at<0||at>1||p.some(k=>Math.abs(k.at-at)<.001)){$('#ov-kf-status').textContent='Choose a new time inside the layer (close the panel and seek the timeline).';return;}if(p.length>=8){$('#ov-kf-status').textContent='Maximum 8 points.';return;}
+ pushUndo();const xy=AlyaMotion.position(o,playhead);o.keyframes=[...p.map(k=>({...k})),{at,...xy}].sort((a,b)=>a.at-b.at);o.motion=true;$('#ov-motion').checked=true;renderKeyframeControls(o);renderImageOverlays();scheduleSave();$('#ov-kf-status').textContent='Point added. Edit X/Y.';};
 let trackingPatch=false;
 $('#ov-track-patch').onclick=async()=>{
  const o=state.overlays.find(o=>o.id===selectedOverlay),status=$('#ov-track-status');if(!o||trackingPatch)return;
@@ -1406,10 +1406,10 @@ $('#ov-track-patch').onclick=async()=>{
 $('#ov-kf-clear').onclick=()=>{const o=state.overlays.find(o=>o.id===selectedOverlay);if(!o)return;pushUndo();delete o.keyframes;renderKeyframeControls(o);renderImageOverlays();scheduleSave();};
 $('#ov-easing').onchange=e=>{const o=state.overlays.find(o=>o.id===selectedOverlay);if(!o)return;pushUndo();o.easing=e.target.value;renderImageOverlays();scheduleSave();};
 $('#btn-speed-curve').onclick=()=>{
- const c=state.clips.find(x=>x.id===selectedClipId);if(!c||c.kind!=='video'){alert('Video clip select karo.');return;}
+ const c=state.clips.find(x=>x.id===selectedClipId);if(!c||c.kind!=='video'){alert('Select a video clip.');return;}
  const values=['start','mid','end'].map(k=>Number($('#curve-'+k).value));if(values.some(v=>!Number.isFinite(v)||v<.5||v>4)){alert('Speed 0.5x se 4x ke beech rakho.');return;}
  const smooth=$('#curve-mode').value==='smooth',count=smooth?12:3,min=smooth?3:1.5;
- if(c.trimEnd-c.trimStart<min){alert('Is mode ke liye kam se kam '+min+'s source chahiye.');return;}
+ if(c.trimEnd-c.trimStart<min){alert('This mode needs at least '+min+'s of source.');return;}
  pushUndo();const step=(c.trimEnd-c.trimStart)/count;
  const parts=Array.from({length:count},(_,i)=>{let speed=values[i];if(smooth){const q=(i+.5)/count,h=q<.5?0:1,t=(q-h*.5)*2,e=t*t*(3-2*t);speed=values[h]+(values[h+1]-values[h])*e;}const nc={...c,id:nextId++,trimStart:c.trimStart+i*step,trimEnd:c.trimStart+(i+1)*step,speed};fileStore[nc.id]=c.file;thumbStore[nc.id]=c.thumbs;return nc;});
  state.clips.splice(state.clips.indexOf(c),1,...parts);selectedClipId=parts[0].id;refreshAll();scheduleSave();$('#clip-process-status').textContent=(smooth?'12-step smooth approximation':'3-section ramp')+' applied. Speeds '+values.join(' / ')+'x. Undo available.';
@@ -1419,8 +1419,8 @@ $('#voice-effect').onchange=e=>{pushUndo();state.voiceEffect=e.target.value;sche
 $('#ov-remove-bg').onclick=async()=>{
  const o=state.overlays.find(o=>o.id===selectedOverlay);if(!o)return;
  const project=currentProjectId,original=o.data;
- const b=$('#ov-remove-bg'),status=$('#ov-remove-status');b.disabled=true;status.textContent='Person mask device pe ban raha hai...';
- try{const {removePersonBackground}=await import('./segmentation.js');const cut=await removePersonBackground(original);if(project!==currentProjectId||!state.overlays.includes(o)||o.data!==original){status.textContent='Layer badal gaya. Cutout apply nahi hua.';return;}pushUndo();o.data=cut;renderImageOverlays();scheduleSave();status.textContent='Cutout applied. Edges check karo; Undo se wapas.';}
+ const b=$('#ov-remove-bg'),status=$('#ov-remove-status');b.disabled=true;status.textContent='Building person mask on device...';
+ try{const {removePersonBackground}=await import('./segmentation.js');const cut=await removePersonBackground(original);if(project!==currentProjectId||!state.overlays.includes(o)||o.data!==original){status.textContent='Layer changed. Cutout was not applied.';return;}pushUndo();o.data=cut;renderImageOverlays();scheduleSave();status.textContent='Cutout applied. Check the edges; Undo restores.';}
  catch(e){status.textContent='Removal failed: '+e.message;}finally{b.disabled=false;}
 };
 let refiningEdges=false;
@@ -1449,8 +1449,8 @@ let mediaProcessBusy=false;
 async function processSelectedClip(mode) {
   if(mediaProcessBusy)return;
   const c=state.clips.find(x=>x.id===selectedClipId)||clipAtTime(playhead)?.clip;
-  if(!c){alert('Pehle clip select karo.');return;}
-  if(['reverse','chroma'].includes(mode) && (c.kind!=='video'||c.trimEnd-c.trimStart>20)){alert('Video processing: max20 source seconds. Pehle trim karo.');return;}
+  if(!c){alert('Select a clip first.');return;}
+  if(['reverse','chroma'].includes(mode) && (c.kind!=='video'||c.trimEnd-c.trimStart>20)){alert('Video processing: max 20 source seconds. Trim first.');return;}
   let unlock;try{unlock=Exporter.lock();}catch(e){$('#clip-process-status').textContent=e.message;return;}
   const project=currentProjectId,processSnapshot=snapshot(),processInfo=clipAtTime(playhead);
   mediaProcessBusy=true;$('#btn-home').disabled=true;pause();$('#clip-process-status').textContent=mode+' processing...';
@@ -1478,7 +1478,7 @@ async function processSelectedClip(mode) {
       if(await ff.exec(cmd)!==0)throw Error('Reverse failed');
     }
     const bytes=await ff.readFile(out);const file=new File([bytes],name,{type:kind==='image'?'image/png':'video/mp4'});
-    if(project!==currentProjectId||processSnapshot!==snapshot()||!state.clips.includes(c)){$('#clip-process-status').textContent='Project edit ho gaya. Process result apply nahi hua.';return;}
+    if(project!==currentProjectId||processSnapshot!==snapshot()||!state.clips.includes(c)){$('#clip-process-status').textContent='Project was edited. Process result was not applied.';return;}
     const id=nextId++,url=mediaUrl(file);const nc={id,kind,file,name,url,srcDuration:dur,trimStart:0,trimEnd:dur,speed:1,w:c.w,h:c.h,thumbs:kind==='image'?[url]:mode==='reverse'?c.thumbs.slice().reverse():await makeThumbs(url,dur)};
     if(project!==currentProjectId||processSnapshot!==snapshot()||!state.clips.includes(c)){$('#clip-process-status').textContent='Project changed while thumbnails loaded. Result discarded.';return;}
     pushUndo();fileStore[id]=file;thumbStore[id]=nc.thumbs;
@@ -1525,22 +1525,22 @@ function renderBeatMarkers(){
   const del=document.createElement('button');del.className='chip-btn danger';del.textContent='×';del.setAttribute('aria-label','Delete marker '+t);del.onclick=()=>{pushUndo();state.beats=validBeatTimes().filter(q=>q!==t);renderBeatMarkers();scheduleSave();};row.append(seek,input,del);review.append(row);
  });
 }
-function addBeatMarker(t){const times=validBeatTimes();if(!Number.isFinite(t)||t<0||t>totalDur()||times.some(q=>Math.abs(q-t)<.05)){$('#beat-status').textContent='Project ke andar naya time choose karo (minimum0.05s gap).';return;}if(times.length>=100){$('#beat-status').textContent='Maximum100 markers.';return;}pushUndo();state.beats=[...times,Math.round(t*100)/100].sort((a,b)=>a-b);renderBeatMarkers();scheduleSave();$('#beat-status').textContent='Marker added. Review/edit/remove before split. Undo available.';}
+function addBeatMarker(t){const times=validBeatTimes();if(!Number.isFinite(t)||t<0||t>totalDur()||times.some(q=>Math.abs(q-t)<.05)){$('#beat-status').textContent='Choose a new time inside the project (minimum 0.05s gap).';return;}if(times.length>=100){$('#beat-status').textContent='Maximum 100 markers.';return;}pushUndo();state.beats=[...times,Math.round(t*100)/100].sort((a,b)=>a-b);renderBeatMarkers();scheduleSave();$('#beat-status').textContent='Marker added. Review/edit/remove before split. Undo available.';}
 $('#beat-add').onclick=()=>addBeatMarker(Number($('#beat-time').value));$('#beat-add-playhead').onclick=()=>addBeatMarker(playhead);$('#beat-clear').onclick=()=>{pushUndo();state.beats=[];renderBeatMarkers();scheduleSave();};
 $('#btn-beats').onclick=async()=>{
- const status=$('#beat-status');if(!state.music?.file){status.textContent='Pehle music add karo.';return;}
+ const status=$('#beat-status');if(!state.music?.file){status.textContent='Add music first.';return;}
  const project=currentProjectId,music=state.music,sourceStart=state.music.sourceStart||0,button=$('#btn-beats');button.disabled=true;
  let ctx;try{ctx=new AudioContext();
-  status.textContent='Music decode ho rahi hai, device pe...';const audio=await ctx.decodeAudioData(await music.file.arrayBuffer());
-  if(project!==currentProjectId||state.music!==music||(state.music.sourceStart||0)!==sourceStart){status.textContent='Music/project badal gaya. Markers apply nahi hue.';return;}
-  if(audio.duration>120){status.textContent='Max 2 min music. Short audio choose karo.';return;}
+  status.textContent='Decoding music on device...';const audio=await ctx.decodeAudioData(await music.file.arrayBuffer());
+  if(project!==currentProjectId||state.music!==music||(state.music.sourceStart||0)!==sourceStart){status.textContent='Music/project changed. Markers were not applied.';return;}
+  if(audio.duration>120){status.textContent='Max 2 min music. Choose a shorter audio.';return;}
   pushUndo();state.beats=detectEnergyPeaks(audio.getChannelData(0),audio.sampleRate).map(t=>Math.round((t-sourceStart)*100)/100).filter(t=>t>=0&&t<=totalDur());renderBeatMarkers();scheduleSave();
-  status.textContent=state.beats.length+' suggested markers. Review karo; silence/soft music mein miss ho sakte hain.';
+  status.textContent=state.beats.length+' suggested markers. Review them; silence or soft music can be missed.';
  }catch(e){status.textContent='Beat analysis failed: '+e.message;}finally{if(ctx)ctx.close();button.disabled=false;}
 };
 $('#btn-cut-beats').onclick=()=>{
- const times=validBeatTimes();if(!times.length){$('#beat-status').textContent='Pehle markers add/suggest karo.';return;}
- if(state.transitions){$('#beat-status').textContent='Exact marker cuts ke liye pehle transitions OFF karo. Overlap timing alag hoti hai.';return;}
+ const times=validBeatTimes();if(!times.length){$('#beat-status').textContent='Add or suggest markers first.';return;}
+ if(state.transitions){$('#beat-status').textContent='Turn transitions OFF first for exact marker cuts. Overlap timing differs.';return;}
  pushUndo();state.beats=times;let offset=0,n=0;const out=[];
  for(const c of state.clips){const dur=effDur(c);const cuts=times.filter(t=>t>offset+.15&&t<offset+dur-.15).filter((t,i,arr)=>!i||t-arr[i-1]>=.15);
   if(c.kind==='image'||!cuts.length)out.push(c);else{let start=c.trimStart;for(const end of [...cuts.map(t=>c.trimStart+(t-offset)*(c.speed||1)),c.trimEnd]){const part={...c,id:nextId++,trimStart:start,trimEnd:end};fileStore[part.id]=c.file;thumbStore[part.id]=c.thumbs;out.push(part);start=end;n++;}}

@@ -10,20 +10,20 @@ with sync_playwright() as p:
     page.wait_for_function('!document.querySelector("#btn-home").disabled')
     assert page.evaluate('window.__alya.state.clips.length')==1
     assert page.evaluate('window.__alya.state.clips[0].name')=='photo.jpg'
-    assert 'apply nahi hua' in page.locator('#clip-process-status').inner_text()
+    assert 'was not applied' in page.locator('#clip-process-status').inner_text()
     page.click('#panel-clips .panel-close');page.click('[data-panel=music]');page.set_input_files('#file-music',str(ROOT/'test-assets/music15.mp3'))
     page.evaluate("()=>{window.AudioContext=class{decodeAudioData(){return new Promise(r=>window.finishBeats=r)}close(){}}}")
     page.click('#btn-beats');page.wait_for_function('typeof window.finishBeats==="function"');assert page.locator('#btn-beats').is_disabled()
     page.click('#btn-remove-music');page.evaluate("window.finishBeats({duration:1,sampleRate:100,getChannelData:()=>new Float32Array(100)})")
     page.wait_for_function('!document.querySelector("#btn-beats").disabled')
-    assert 'apply nahi hue' in page.locator('#beat-status').inner_text()
+    assert 'were not applied' in page.locator('#beat-status').inner_text()
     assert page.evaluate('window.__alya.state.beats.length')==0
     page.click('#panel-music .panel-close');page.click('[data-panel=overlays]');page.set_input_files('#ov-file',str(ROOT/'test-assets/photo.jpg'));page.wait_for_function('window.__alya.state.overlays.length===1')
     page.route('**/segmentation.js',lambda r:r.fulfill(content_type='application/javascript',body='export const removePersonBackground=()=>new Promise(r=>window.finishCutout=r);'))
     page.click('#ov-remove-bg');page.wait_for_function('typeof window.finishCutout==="function"');page.click('#ov-delete')
     page.evaluate("window.finishCutout('data:image/png;base64,AA==')");page.wait_for_function('!document.querySelector("#ov-remove-bg").disabled')
     assert page.evaluate('window.__alya.state.overlays.length')==0
-    assert 'apply nahi hua' in page.locator('#ov-remove-status').inner_text()
+    assert 'was not applied' in page.locator('#ov-remove-status').inner_text()
     page.screenshot(path='/downloads/process-stale.png')
     print('PASS: stale freeze result cannot insert/replace clips after deletion; removed music rejects beat result; controls recover. Mocked engine/decode.')
     browser.close()

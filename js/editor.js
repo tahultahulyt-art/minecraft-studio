@@ -20,7 +20,7 @@ const Exporter = (() => {
     warm:     { ff: 'eq=brightness=0.02:saturation=1.15,colorbalance=rm=.08:bm=-.08', css: 'sepia(.28) saturate(1.3)' },
     cool:     { ff: 'eq=saturation=1.05,colorbalance=rm=-.07:bm=.09', css: 'hue-rotate(-12deg) saturate(1.05) brightness(1.02)' },
     vintage:  { ff: 'eq=contrast=.92:saturation=.65:brightness=.03,vignette=PI/4', css: 'sepia(.4) contrast(.9) saturate(.8)' },
-    pixel:    { ff: 'scale=iw/10:ih/10:flags=neighbor,scale=iw*10:ih*10:flags=neighbor', css: 'contrast(1.06) saturate(1.15)' }, /* pixelate: sirf export mein dikhta hai */
+    pixel:    { ff: 'scale=iw/10:ih/10:flags=neighbor,scale=iw*10:ih*10:flags=neighbor', css: 'contrast(1.06) saturate(1.15)' }, /* pixelate: visible only in export */
   };
 
   const FONT_FILES = {
@@ -118,7 +118,7 @@ const Exporter = (() => {
     const TOT = totalDur(project);
     if (TOT <= 0) throw new Error('No clips');
 
-    onStage && onStage('Files load ho rahi hain...');
+    onStage && onStage('Loading files...');
     const args = [];
     const fc = [];
     const names = [];
@@ -285,7 +285,7 @@ const Exporter = (() => {
       '-movflags', '+faststart', '-t', TOTX.toFixed(3),
       'out.mp4');
 
-    onStage && onStage('Export chal raha hai...');
+    onStage && onStage('Exporting...');
     let lastT = 0;
     const logListener = ({ message }) => {
       const m = message.match(/time=(\d+):(\d+):([\d.]+)/);
@@ -305,7 +305,7 @@ const Exporter = (() => {
     }
     ff.off('log', logListener);
 
-    onStage && onStage('Video tayyar ho rahi hai...');
+    onStage && onStage('Preparing video...');
     const data = await ff.readFile('out.mp4');
     onProgress && onProgress(1, TOT);
 
@@ -335,7 +335,7 @@ const Exporter = (() => {
 Exporter.extractAudio = function(project,onStage){return Exporter.exclusive(async()=>{
   const ff = await Exporter.ensureLoaded();
   const TOT = Exporter.totalDur(project);
-  onStage && onStage('Audio nikala ja raha hai...');
+  onStage && onStage('Extracting audio...');
   const args = [];
   const fc = [];
   const names = [];

@@ -22,7 +22,7 @@ with sync_playwright() as p:
     page.click('[data-panel=text]');page.click('#btn-add-text');page.locator('#te-content').fill('Redo Check');page.click('#te-done');page.click('#panel-text .panel-close')
     page.wait_for_function("window.__alya.state.texts.length===1&&window.__alya.state.texts[0].content==='Redo Check'")
     # Keyboard undo reverts the content edit; redo restores it
-    page.keyboard.press('Control+z');page.wait_for_function("window.__alya.state.texts[0].content==='Apna text'")
+    page.keyboard.press('Control+z');page.wait_for_function("window.__alya.state.texts[0].content==='Your text'")
     page.keyboard.press('Control+Shift+z');page.wait_for_function("window.__alya.state.texts[0].content==='Redo Check'")
     # Two button undos remove the text layer entirely
     page.click('#btn-undo');page.click('#btn-undo')
